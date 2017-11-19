@@ -4,6 +4,7 @@
 #include <opencv2/tracking.hpp>
 #include <opencv2/core/ocl.hpp>
 #include <opencv2/imgproc.hpp>
+#include <QFileDialog>
 
 using namespace cv;
 using namespace std;
@@ -14,8 +15,37 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    ui->pointsTable->setRowCount(0);
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+
+void MainWindow::on_actionOpen_Video_triggered()
+{
+    MainWindow::startTracking();
+}
+
+void MainWindow::startTracking() {
+    QString fileName = QFileDialog::getOpenFileName(this,
+            tr("Open Video"), "",
+            tr("Video (*.mp4, *.mov);;"));
+
+    if (fileName != "") {
+        MainWindow::trackVideo(fileName);
+    }
+}
+
+void MainWindow::trackVideo(QString &fileName) {
+
+//    graphicsView
+    QGraphicsScene *graphScene = new QGraphicsScene(this);
+    ui->graphicsView->setScene(graphScene);
+
     string trackerTypes[6] = {"BOOSTING", "MIL", "KCF", "TLD","MEDIANFLOW", "GOTURN"};
-    string trackerType = trackerTypes[2];
+    string trackerType = trackerTypes[4];
     Ptr<Tracker> tracker;
 
     if (trackerType == "BOOSTING")
@@ -31,14 +61,16 @@ MainWindow::MainWindow(QWidget *parent) :
     if (trackerType == "GOTURN")
         tracker = TrackerGOTURN::create();
 
-    VideoCapture video("/Users/vvruspat/Desktop/mouse.mp4");
+    const string file = fileName.toStdString();
 
+    VideoCapture video(file);
 
     // Read first frame
     Mat frame;
     bool ok = video.read(frame);
     // Define initial boundibg box
     Rect2d bbox(287, 23, 86, 320);
+    Rect2d prevBbox;
 
     // Uncomment the line below to select a different bounding box
     bbox = selectROI(frame, false);
@@ -49,10 +81,24 @@ MainWindow::MainWindow(QWidget *parent) :
 
     tracker->init(frame, bbox);
 
+    prevBbox = bbox;
+
     while(video.read(frame))
     {
         // Update the tracking result
         bool ok = tracker->update(frame, bbox);
+
+        int rowNumber = ui->pointsTable->rowCount();
+
+        ui->pointsTable->setRowCount(rowNumber + 1);
+
+        ui->pointsTable->setItem(rowNumber, 0, new QTableWidgetItem(QString::number(video.get(cv::CAP_PROP_POS_MSEC))));
+        ui->pointsTable->setItem(rowNumber, 1, new QTableWidgetItem(QString::number(bbox.x)));
+        ui->pointsTable->setItem(rowNumber, 2, new QTableWidgetItem(QString::number(bbox.y)));
+
+        graphScene->addLine(prevBbox.x, prevBbox.y, bbox.x, bbox.y, QPen(QBrush(Qt::black),1));
+        prevBbox = bbox;
+        ui->graphicsView->show();
 
         if (ok)
         {
@@ -62,11 +108,13 @@ MainWindow::MainWindow(QWidget *parent) :
         else
         {
             // Tracking failure detected.
-            putText(frame, "Tracking failure detected", Point(100,80), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0,0,255),2);
+            putText(frame, "Tracking failure detected", Point(100,100), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0,0,255),2);
         }
 
         // Display tracker type on frame
-        putText(frame, trackerType + " Tracker", Point(100,20), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(50,170,50),2);
+        putText(frame, "Press ESC to stop tracking", Point(100,20), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(50,170,50),2);
+        // Display tracker type on frame
+        putText(frame, trackerType + " Tracker", Point(100,60), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(50,170,50),2);
 
         // Display frame.
         imshow("Tracking", frame);
@@ -79,12 +127,14 @@ MainWindow::MainWindow(QWidget *parent) :
         }
 
     }
-
-//    Mat inputImage = cv::imread("/Volumes/Macintosh HD 1/Users/vvruspat/Downloads/Disk_antillia.png");
-//    imshow("Display image", inputImage);
 }
 
-MainWindow::~MainWindow()
+void MainWindow::on_actionExit_triggered()
 {
-    delete ui;
+    MainWindow::close();
+}
+
+void MainWindow::on_toolOpenVideo_clicked()
+{
+    MainWindow::startTracking();
 }

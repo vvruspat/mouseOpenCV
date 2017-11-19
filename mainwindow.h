@@ -14,6 +14,15 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
+    void trackVideo(QString &fileName);
+    void startTracking();
+
+private slots:
+    void on_actionOpen_Video_triggered();
+
+    void on_actionExit_triggered();
+
+    void on_toolOpenVideo_clicked();
 
 private:
     Ui::MainWindow *ui;
